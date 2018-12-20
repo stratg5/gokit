@@ -4,13 +4,13 @@
 package client
 
 import (
+	"arood/base"
 	"io"
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/examples/profilesvc"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/sd"
 	"github.com/go-kit/kit/sd/consul"
@@ -18,9 +18,8 @@ import (
 )
 
 // New returns a service that's load-balanced over instances of profilesvc found
-// in the provided Consul server. The mechanism of looking up profilesvc
-// instances in Consul is hard-coded into the client.
-func New(consulAddr string, logger log.Logger) (profilesvc.Service, error) {
+// in the provided Consul server.
+func New(consulAddr string, logger log.Logger) (base.Service, error) {
 	apiclient, err := consulapi.NewClient(&consulapi.Config{
 		Address: consulAddr,
 	})
@@ -28,8 +27,6 @@ func New(consulAddr string, logger log.Logger) (profilesvc.Service, error) {
 		return nil, err
 	}
 
-	// As the implementer of profilesvc, we declare and enforce these
-	// parameters for all of the profilesvc consumers.
 	var (
 		consulService = "profilesvc"
 		consulTags    = []string{"prod"}
@@ -41,38 +38,31 @@ func New(consulAddr string, logger log.Logger) (profilesvc.Service, error) {
 	var (
 		sdclient  = consul.NewClient(apiclient)
 		instancer = consul.NewInstancer(sdclient, logger, consulService, consulTags, passingOnly)
-		endpoints profilesvc.Endpoints
+		endpoints base.Endpoints
 	)
 	{
-		factory := factoryFor(profilesvc.MakePostProfileEndpoint)
+		factory := factoryFor(base.MakePostProfileEndpoint)
 		endpointer := sd.NewEndpointer(instancer, factory, logger)
 		balancer := lb.NewRoundRobin(endpointer)
 		retry := lb.Retry(retryMax, retryTimeout, balancer)
 		endpoints.PostProfileEndpoint = retry
 	}
 	{
-		factory := factoryFor(profilesvc.MakeGetProfileEndpoint)
+		factory := factoryFor(base.MakeGetProfileEndpoint)
 		endpointer := sd.NewEndpointer(instancer, factory, logger)
 		balancer := lb.NewRoundRobin(endpointer)
 		retry := lb.Retry(retryMax, retryTimeout, balancer)
 		endpoints.GetProfileEndpoint = retry
 	}
 	{
-		factory := factoryFor(profilesvc.MakePutProfileEndpoint)
+		factory := factoryFor(base.MakePutProfileEndpoint)
 		endpointer := sd.NewEndpointer(instancer, factory, logger)
 		balancer := lb.NewRoundRobin(endpointer)
 		retry := lb.Retry(retryMax, retryTimeout, balancer)
 		endpoints.PutProfileEndpoint = retry
 	}
 	{
-		factory := factoryFor(profilesvc.MakePatchProfileEndpoint)
-		endpointer := sd.NewEndpointer(instancer, factory, logger)
-		balancer := lb.NewRoundRobin(endpointer)
-		retry := lb.Retry(retryMax, retryTimeout, balancer)
-		endpoints.PatchProfileEndpoint = retry
-	}
-	{
-		factory := factoryFor(profilesvc.MakeDeleteProfileEndpoint)
+		factory := factoryFor(base.MakeDeleteProfileEndpoint)
 		endpointer := sd.NewEndpointer(instancer, factory, logger)
 		balancer := lb.NewRoundRobin(endpointer)
 		retry := lb.Retry(retryMax, retryTimeout, balancer)
@@ -82,9 +72,9 @@ func New(consulAddr string, logger log.Logger) (profilesvc.Service, error) {
 	return endpoints, nil
 }
 
-func factoryFor(makeEndpoint func(profilesvc.Service) endpoint.Endpoint) sd.Factory {
+func factoryFor(makeEndpoint func(base.Service) endpoint.Endpoint) sd.Factory {
 	return func(instance string) (endpoint.Endpoint, io.Closer, error) {
-		service, err := profilesvc.MakeClientEndpoints(instance)
+		service, err := base.MakeClientEndpoints(instance)
 		if err != nil {
 			return nil, nil, err
 		}

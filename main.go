@@ -1,6 +1,7 @@
 package main
 
 import (
+	"arood/base"
 	"flag"
 	"fmt"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/go-kit/kit/examples/profilesvc"
 	"github.com/go-kit/kit/log"
 )
 
@@ -25,15 +25,15 @@ func main() {
 		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 
-	var s profilesvc.Service
+	var s base.Service
 	{
-		s = profilesvc.NewInmemService()
-		s = profilesvc.LoggingMiddleware(logger)(s)
+		s = base.NewInmemService()
+		s = base.LoggingMiddleware(logger)(s)
 	}
 
 	var h http.Handler
 	{
-		h = profilesvc.MakeHTTPHandler(s, log.With(logger, "component", "HTTP"))
+		h = base.MakeHTTPHandler(s, log.With(logger, "component", "HTTP"))
 	}
 
 	errs := make(chan error)

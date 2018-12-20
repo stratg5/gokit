@@ -1,4 +1,4 @@
-package profilesvc
+package base
 
 import (
 	"context"

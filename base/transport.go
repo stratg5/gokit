@@ -1,6 +1,4 @@
-package profilesvc
-
-// The profilesvc is just over HTTP, so we just have a single transport.go.
+package base
 
 import (
 	"bytes"
@@ -19,12 +17,9 @@ import (
 
 var (
 	// ErrBadRouting is returned when an expected path variable is missing.
-	// It always indicates programmer error.
 	ErrBadRouting = errors.New("inconsistent mapping between route and handler (programmer error)")
 )
 
-// MakeHTTPHandler mounts all of the service endpoints into an http.Handler.
-// Useful in a profilesvc server.
 func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 	r := mux.NewRouter()
 	e := MakeServerEndpoints(s)
@@ -32,16 +27,6 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 		httptransport.ServerErrorLogger(logger),
 		httptransport.ServerErrorEncoder(encodeError),
 	}
-
-	// POST    /profiles/                          adds another profile
-	// GET     /profiles/:id                       retrieves the given profile by id
-	// PUT     /profiles/:id                       post updated profile information about the profile
-	// PATCH   /profiles/:id                       partial updated profile information
-	// DELETE  /profiles/:id                       remove the given profile
-	// GET     /profiles/:id/addresses/            retrieve addresses associated with the profile
-	// GET     /profiles/:id/addresses/:addressID  retrieve a particular profile address
-	// POST    /profiles/:id/addresses/            add a new address
-	// DELETE  /profiles/:id/addresses/:addressID  remove an address
 
 	r.Methods("POST").Path("/profiles/").Handler(httptransport.NewServer(
 		e.PostProfileEndpoint,
@@ -58,12 +43,6 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 	r.Methods("PUT").Path("/profiles/{id}").Handler(httptransport.NewServer(
 		e.PutProfileEndpoint,
 		decodePutProfileRequest,
-		encodeResponse,
-		options...,
-	))
-	r.Methods("PATCH").Path("/profiles/{id}").Handler(httptransport.NewServer(
-		e.PatchProfileEndpoint,
-		decodePatchProfileRequest,
 		encodeResponse,
 		options...,
 	))
@@ -109,22 +88,6 @@ func decodePutProfileRequest(_ context.Context, r *http.Request) (request interf
 	}, nil
 }
 
-func decodePatchProfileRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
-	vars := mux.Vars(r)
-	id, ok := vars["id"]
-	if !ok {
-		return nil, ErrBadRouting
-	}
-	var profile Profile
-	if err := json.NewDecoder(r.Body).Decode(&profile); err != nil {
-		return nil, err
-	}
-	return patchProfileRequest{
-		ID:      id,
-		Profile: profile,
-	}, nil
-}
-
 func decodeDeleteProfileRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
 	vars := mux.Vars(r)
 	id, ok := vars["id"]
@@ -156,14 +119,6 @@ func encodePutProfileRequest(ctx context.Context, req *http.Request, request int
 	return encodeRequest(ctx, req, request)
 }
 
-func encodePatchProfileRequest(ctx context.Context, req *http.Request, request interface{}) error {
-	// r.Methods("PATCH").Path("/profiles/{id}")
-	r := request.(patchProfileRequest)
-	profileID := url.QueryEscape(r.ID)
-	req.URL.Path = "/profiles/" + profileID
-	return encodeRequest(ctx, req, request)
-}
-
 func encodeDeleteProfileRequest(ctx context.Context, req *http.Request, request interface{}) error {
 	// r.Methods("DELETE").Path("/profiles/{id}")
 	r := request.(deleteProfileRequest)
@@ -190,12 +145,6 @@ func decodePutProfileResponse(_ context.Context, resp *http.Response) (interface
 	return response, err
 }
 
-func decodePatchProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
-	var response patchProfileResponse
-	err := json.NewDecoder(resp.Body).Decode(&response)
-	return response, err
-}
-
 func decodeDeleteProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
 	var response deleteProfileResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
@@ -210,10 +159,6 @@ type errorer interface {
 	error() error
 }
 
-// encodeResponse is the common method to encode all response types to the
-// client. I chose to do it this way because, since we're using JSON, there's no
-// reason to provide anything more specific. It's certainly possible to
-// specialize on a per-response (per-method) basis.
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
 	if e, ok := response.(errorer); ok && e.error() != nil {
 		// Not a Go kit transport error, but a business-logic error.
@@ -225,9 +170,6 @@ func encodeResponse(ctx context.Context, w http.ResponseWriter, response interfa
 	return json.NewEncoder(w).Encode(response)
 }
 
-// encodeRequest likewise JSON-encodes the request to the HTTP request body.
-// Don't use it directly as a transport/http.Client EncodeRequestFunc:
-// profilesvc endpoints require mutating the HTTP method and request path.
 func encodeRequest(_ context.Context, req *http.Request, request interface{}) error {
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(request)

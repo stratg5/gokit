@@ -1,4 +1,4 @@
-package profilesvc
+package base
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// Service is a simple CRUD interface for user profiles.
+// Service is an interface for the profile functions
 type Service interface {
 	PostProfile(ctx context.Context, p Profile) error
 	GetProfile(ctx context.Context, id string) (Profile, error)
@@ -15,7 +15,6 @@ type Service interface {
 }
 
 // Profile represents a single user profile.
-// ID should be globally unique.
 type Profile struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name,omitempty"`
@@ -23,7 +22,6 @@ type Profile struct {
 }
 
 // Address is a field of a user profile.
-// ID should be unique within the profile (at a minimum).
 type Address struct {
 	ID       string `json:"id"`
 	Location string `json:"location,omitempty"`
@@ -50,7 +48,7 @@ func (s *inmemService) PostProfile(ctx context.Context, p Profile) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	if _, ok := s.m[p.ID]; ok {
-		return ErrAlreadyExists // POST = create, don't overwrite
+		return ErrAlreadyExists
 	}
 	s.m[p.ID] = p
 	return nil
@@ -72,7 +70,7 @@ func (s *inmemService) PutProfile(ctx context.Context, id string, p Profile) err
 	}
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	s.m[id] = p // PUT = create or update
+	s.m[id] = p
 	return nil
 }
 
