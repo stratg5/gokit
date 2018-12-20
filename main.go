@@ -10,6 +10,9 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/metrics"
+	"github.com/go-kit/kit/metrics/prometheus"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -25,10 +28,30 @@ func main() {
 		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 
+	// Create the (sparse) metrics we'll use in the service. They, too, are
+	// dependencies that we pass to components that use them.
+	var ints, chars metrics.Counter
+	{
+		// Business-level metrics.
+		ints = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: "example",
+			Subsystem: "addsvc",
+			Name:      "integers_summed",
+			Help:      "Total count of integers summed via the Sum method.",
+		}, []string{})
+		chars = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: "example",
+			Subsystem: "addsvc",
+			Name:      "characters_concatenated",
+			Help:      "Total count of characters concatenated via the Concat method.",
+		}, []string{})
+	}
+
 	var s base.Service
 	{
 		s = base.NewInmemService()
 		s = base.LoggingMiddleware(logger)(s)
+		s = base.InstrumentingMiddleware(ints, chars)(s)
 	}
 
 	var h http.Handler
