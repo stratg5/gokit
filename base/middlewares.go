@@ -2,6 +2,7 @@ package base
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -53,45 +54,63 @@ func (mw loggingMiddleware) DeleteProfile(ctx context.Context, id string) (err e
 	return mw.next.DeleteProfile(ctx, id)
 }
 
-// InstrumentingMiddleware returns a service middleware that instruments
-// the number of integers summed and characters concatenated over the lifetime of
-// the service.
-func InstrumentingMiddleware(ints, chars metrics.Counter) Middleware {
+func InstrumentingMiddleware(
+	requestCount metrics.Counter,
+	requestLatency metrics.Histogram,
+	countResult metrics.Histogram,
+) Middleware {
 	return func(next Service) Service {
-		return instrumentingMiddleware{
-			ints:  ints,
-			chars: chars,
-			next:  next,
-		}
+		return instrmw{requestCount, requestLatency, countResult, next}
 	}
 }
 
-type instrumentingMiddleware struct {
-	ints  metrics.Counter
-	chars metrics.Counter
-	next  Service
+type instrmw struct {
+	requestCount   metrics.Counter
+	requestLatency metrics.Histogram
+	countResult    metrics.Histogram
+	Service
 }
 
-func (mw instrumentingMiddleware) PostProfile(ctx context.Context, p Profile) (err error) {
-	err = mw.next.PostProfile(ctx, p)
-	mw.ints.Add(float64(1))
-	return err
+func (mw instrmw) PostProfile(ctx context.Context, p Profile) (err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "postprofile", "error", "false"}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+
+	err = mw.Service.PostProfile(ctx, p)
+	return
 }
 
-func (mw instrumentingMiddleware) GetProfile(ctx context.Context, id string) (p Profile, err error) {
-	p, err = mw.next.GetProfile(ctx, id)
-	mw.chars.Add(float64(1))
-	return p, err
+func (mw instrmw) GetProfile(ctx context.Context, id string) (p Profile, err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "getprofile", "error", "false"}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+
+	p, err = mw.Service.GetProfile(ctx, id)
+	return
 }
 
-func (mw instrumentingMiddleware) PutProfile(ctx context.Context, id string, p Profile) (err error) {
-	err = mw.next.PutProfile(ctx, id, p)
-	mw.chars.Add(float64(1))
-	return err
+func (mw instrmw) PutProfile(ctx context.Context, id string, p Profile) (err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "putprofile", "error", "false"}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+
+	err = mw.Service.PutProfile(ctx, id, p)
+	return
 }
 
-func (mw instrumentingMiddleware) DeleteProfile(ctx context.Context, id string) (err error) {
-	err = mw.next.DeleteProfile(ctx, id)
-	mw.chars.Add(float64(1))
-	return err
+func (mw instrmw) DeleteProfile(ctx context.Context, id string) (err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "deleteprofile", "error", fmt.Sprint(err != nil)}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+
+	err = mw.Service.DeleteProfile(ctx, id)
+	return
 }
