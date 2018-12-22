@@ -55,12 +55,6 @@ func (s *inmemService) PostProfile(ctx context.Context, p Profile) error {
 		return ErrAlreadyExists
 	}
 	s.m[p.ID] = p
-	println("Sending request")
-	_, err := s.ep(ctx, "req")
-	if err != nil {
-		println("ERROR")
-		println(err.Error())
-	}
 	return nil
 }
 
