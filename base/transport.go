@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 
 	"github.com/gorilla/mux"
 
@@ -105,66 +104,18 @@ func encodePostProfileRequest(ctx context.Context, req *http.Request, request in
 	return encodeRequest(ctx, req, request)
 }
 
-func encodeGetProfileRequest(ctx context.Context, req *http.Request, request interface{}) error {
-	// r.Methods("GET").Path("/profiles/{id}")
-	r := request.(getProfileRequest)
-	profileID := url.QueryEscape(r.ID)
-	req.URL.Path = "/profiles/" + profileID
-	return encodeRequest(ctx, req, request)
-}
-
-func encodePutProfileRequest(ctx context.Context, req *http.Request, request interface{}) error {
-	// r.Methods("PUT").Path("/profiles/{id}")
-	r := request.(putProfileRequest)
-	profileID := url.QueryEscape(r.ID)
-	req.URL.Path = "/profiles/" + profileID
-	return encodeRequest(ctx, req, request)
-}
-
-func encodeDeleteProfileRequest(ctx context.Context, req *http.Request, request interface{}) error {
-	// r.Methods("DELETE").Path("/profiles/{id}")
-	r := request.(deleteProfileRequest)
-	profileID := url.QueryEscape(r.ID)
-	req.URL.Path = "/profiles/" + profileID
-	return encodeRequest(ctx, req, request)
-}
-
 func decodePostProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
 	var response postProfileResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	return response, err
 }
 
-func decodeGetProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
-	var response getProfileResponse
-	err := json.NewDecoder(resp.Body).Decode(&response)
-	return response, err
-}
-
-func decodePutProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
-	var response putProfileResponse
-	err := json.NewDecoder(resp.Body).Decode(&response)
-	return response, err
-}
-
-func decodeDeleteProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
-	var response deleteProfileResponse
-	err := json.NewDecoder(resp.Body).Decode(&response)
-	return response, err
-}
-
-// errorer is implemented by all concrete response types that may contain
-// errors. It allows us to change the HTTP response code without needing to
-// trigger an endpoint (transport-level) error. For more information, read the
-// big comment in endpoints.go.
 type errorer interface {
 	error() error
 }
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
 	if e, ok := response.(errorer); ok && e.error() != nil {
-		// Not a Go kit transport error, but a business-logic error.
-		// Provide those as HTTP errors.
 		encodeError(ctx, e.error(), w)
 		return nil
 	}

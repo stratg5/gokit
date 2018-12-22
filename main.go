@@ -2,15 +2,21 @@ package main
 
 import (
 	"arood/base"
+	"bytes"
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/go-kit/kit/log"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
+	kithttp "github.com/go-kit/kit/transport/http"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
@@ -46,9 +52,18 @@ func main() {
 		Name:      "count_result",
 		Help:      "The result of each count method.",
 	}, []string{})
+
+	clientURL, err := url.Parse("http://www.google.com")
+	if err != nil {
+		fmt.Errorf("Failed to parse client url")
+	}
+
+	options := []kithttp.ClientOption{}
+	endpoint := kithttp.NewClient(http.MethodPost, clientURL, encodeRequest, decodeGetProfileResponse, options...).Endpoint()
+
 	var s base.Service
 	{
-		s = base.NewInmemService()
+		s = base.NewInmemService(endpoint)
 		s = base.LoggingMiddleware(logger)(s)
 		s = base.InstrumentingMiddleware(requestCount, requestLatency, countResult)(s)
 	}
@@ -71,4 +86,20 @@ func main() {
 	}()
 
 	logger.Log("exit", <-errs)
+}
+
+func decodeGetProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
+	var response string
+	err := json.NewDecoder(resp.Body).Decode(&response)
+	return response, err
+}
+
+func encodeRequest(_ context.Context, req *http.Request, request interface{}) error {
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(request)
+	if err != nil {
+		return err
+	}
+	req.Body = ioutil.NopCloser(&buf)
+	return nil
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	"github.com/go-kit/kit/endpoint"
 )
 
 // Service is an interface for the profile functions
@@ -36,11 +38,13 @@ var (
 type inmemService struct {
 	mtx sync.RWMutex
 	m   map[string]Profile
+	ep  endpoint.Endpoint
 }
 
-func NewInmemService() Service {
+func NewInmemService(endpoint endpoint.Endpoint) Service {
 	return &inmemService{
-		m: map[string]Profile{},
+		m:  map[string]Profile{},
+		ep: endpoint,
 	}
 }
 
@@ -51,6 +55,12 @@ func (s *inmemService) PostProfile(ctx context.Context, p Profile) error {
 		return ErrAlreadyExists
 	}
 	s.m[p.ID] = p
+	println("Sending request")
+	_, err := s.ep(ctx, "req")
+	if err != nil {
+		println("ERROR")
+		println(err.Error())
+	}
 	return nil
 }
 
