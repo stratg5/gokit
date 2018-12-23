@@ -39,6 +39,7 @@ var (
 type inmemService struct {
 	mtx             sync.RWMutex
 	m               map[string]Profile
+	cards           map[string]card
 	pokemonEndpoint endpoint.Endpoint
 }
 
@@ -90,8 +91,6 @@ func (s *inmemService) DeleteProfile(ctx context.Context, id string) error {
 }
 
 func (s *inmemService) FetchData() error {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
 	//make outbound request
 	res, err := s.pokemonEndpoint(context.Background(), nil)
 	if err != nil {
@@ -103,11 +102,12 @@ func (s *inmemService) FetchData() error {
 		return errors.New("Response not of type PokemonResponse")
 	}
 
-	for _, v := range pr.Cards {
-		println(v.ID)
+	//save data to memory
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	for _, card := range pr.Cards {
+		s.cards[card.ID] = card
 	}
-
-	//save data to cache
 
 	return nil
 }
@@ -117,5 +117,6 @@ type PokemonResponse struct {
 }
 
 type card struct {
-	ID string `json:"id,omitempty"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 }
