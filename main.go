@@ -22,7 +22,8 @@ import (
 
 func main() {
 	var (
-		httpAddr = flag.String("http.addr", ":8080", "HTTP listen address")
+		httpAddr   = flag.String("http.addr", ":8080", "HTTP listen address")
+		pokemonURL = flag.String("pokemon.url", "https://api.pokemontcg.io/v1/cards", "Outbound Pokemon address")
 	)
 	flag.Parse()
 
@@ -53,17 +54,17 @@ func main() {
 		Help:      "The result of each count method.",
 	}, []string{})
 
-	clientURL, err := url.Parse("http://www.google.com")
+	clientURL, err := url.Parse(*pokemonURL)
 	if err != nil {
 		fmt.Errorf("Failed to parse client url")
 	}
 
 	options := []kithttp.ClientOption{}
-	endpoint := kithttp.NewClient(http.MethodPost, clientURL, encodeRequest, decodeGetProfileResponse, options...).Endpoint()
+	pokemonEndpoint := kithttp.NewClient(http.MethodGet, clientURL, encodeRequest, decodeGetProfileResponse, options...).Endpoint()
 
 	var s base.Service
 	{
-		s = base.NewInmemService(endpoint)
+		s = base.NewInmemService(pokemonEndpoint)
 		s = base.LoggingMiddleware(logger)(s)
 		s = base.InstrumentingMiddleware(requestCount, requestLatency, countResult)(s)
 	}
@@ -81,6 +82,13 @@ func main() {
 	}()
 
 	go func() {
+		err := s.FetchData()
+		if err != nil {
+			errs <- err
+		}
+	}()
+
+	go func() {
 		logger.Log("transport", "HTTP", "addr", *httpAddr)
 		errs <- http.ListenAndServe(*httpAddr, h)
 	}()
@@ -89,7 +97,7 @@ func main() {
 }
 
 func decodeGetProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
-	var response string
+	var response base.PokemonResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	return response, err
 }

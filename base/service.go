@@ -14,6 +14,7 @@ type Service interface {
 	GetProfile(ctx context.Context, id string) (Profile, error)
 	PutProfile(ctx context.Context, id string, p Profile) error
 	DeleteProfile(ctx context.Context, id string) error
+	FetchData() error
 }
 
 // Profile represents a single user profile.
@@ -36,15 +37,15 @@ var (
 )
 
 type inmemService struct {
-	mtx sync.RWMutex
-	m   map[string]Profile
-	ep  endpoint.Endpoint
+	mtx             sync.RWMutex
+	m               map[string]Profile
+	pokemonEndpoint endpoint.Endpoint
 }
 
-func NewInmemService(endpoint endpoint.Endpoint) Service {
+func NewInmemService(pokemonEndpoint endpoint.Endpoint) Service {
 	return &inmemService{
-		m:  map[string]Profile{},
-		ep: endpoint,
+		m:               map[string]Profile{},
+		pokemonEndpoint: pokemonEndpoint,
 	}
 }
 
@@ -86,4 +87,35 @@ func (s *inmemService) DeleteProfile(ctx context.Context, id string) error {
 	}
 	delete(s.m, id)
 	return nil
+}
+
+func (s *inmemService) FetchData() error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	//make outbound request
+	res, err := s.pokemonEndpoint(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	pr, ok := res.(PokemonResponse)
+	if !ok {
+		return errors.New("Response not of type PokemonResponse")
+	}
+
+	for _, v := range pr.Cards {
+		println(v.ID)
+	}
+
+	//save data to cache
+
+	return nil
+}
+
+type PokemonResponse struct {
+	Cards []card `json:"cards,omitempty"`
+}
+
+type card struct {
+	ID string `json:"id,omitempty"`
 }

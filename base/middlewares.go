@@ -54,6 +54,13 @@ func (mw loggingMiddleware) DeleteProfile(ctx context.Context, id string) (err e
 	return mw.next.DeleteProfile(ctx, id)
 }
 
+func (mw loggingMiddleware) FetchData() (err error) {
+	defer func(begin time.Time) {
+		mw.logger.Log("method", "FetchData", "took", time.Since(begin), "err", err)
+	}(time.Now())
+	return mw.next.FetchData()
+}
+
 func InstrumentingMiddleware(
 	requestCount metrics.Counter,
 	requestLatency metrics.Histogram,
