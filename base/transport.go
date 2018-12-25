@@ -52,6 +52,12 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 		encodeResponse,
 		options...,
 	))
+	r.Methods("GET").Path("/getcards").Handler(httptransport.NewServer(
+		e.GetCardsEndpoint,
+		decodeGetCardsRequest,
+		encodeResponse,
+		options...,
+	))
 	r.Methods("GET").Path("/metrics").Handler(stdprometheus.Handler())
 	return r
 }
@@ -71,6 +77,10 @@ func decodeGetProfileRequest(_ context.Context, r *http.Request) (request interf
 		return nil, ErrBadRouting
 	}
 	return getProfileRequest{ID: id}, nil
+}
+
+func decodeGetCardsRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
+	return nil, nil
 }
 
 func decodePutProfileRequest(_ context.Context, r *http.Request) (request interface{}, err error) {

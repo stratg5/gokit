@@ -14,6 +14,7 @@ type Service interface {
 	GetProfile(ctx context.Context, id string) (Profile, error)
 	PutProfile(ctx context.Context, id string, p Profile) error
 	DeleteProfile(ctx context.Context, id string) error
+	GetCards() (PokemonResponse, error)
 	FetchData() error
 }
 
@@ -28,6 +29,15 @@ type Profile struct {
 type Address struct {
 	ID       string `json:"id"`
 	Location string `json:"location,omitempty"`
+}
+
+type PokemonResponse struct {
+	Cards []card `json:"cards,omitempty"`
+}
+
+type card struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 var (
@@ -46,6 +56,7 @@ type inmemService struct {
 func NewInmemService(pokemonEndpoint endpoint.Endpoint) Service {
 	return &inmemService{
 		m:               map[string]Profile{},
+		cards:           map[string]card{},
 		pokemonEndpoint: pokemonEndpoint,
 	}
 }
@@ -90,6 +101,14 @@ func (s *inmemService) DeleteProfile(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *inmemService) GetCards() (PokemonResponse, error) {
+	cardList := make([]card, 0)
+	for _, card := range s.cards {
+		cardList = append(cardList, card)
+	}
+	return PokemonResponse{Cards: cardList}, nil
+}
+
 func (s *inmemService) FetchData() error {
 	//make outbound request
 	res, err := s.pokemonEndpoint(context.Background(), nil)
@@ -110,13 +129,4 @@ func (s *inmemService) FetchData() error {
 	}
 
 	return nil
-}
-
-type PokemonResponse struct {
-	Cards []card `json:"cards,omitempty"`
-}
-
-type card struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
 }

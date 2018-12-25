@@ -14,6 +14,7 @@ type Endpoints struct {
 	GetProfileEndpoint    endpoint.Endpoint
 	PutProfileEndpoint    endpoint.Endpoint
 	DeleteProfileEndpoint endpoint.Endpoint
+	GetCardsEndpoint      endpoint.Endpoint
 }
 
 // MakeServerEndpoints creates endpoints for the server
@@ -23,6 +24,7 @@ func MakeServerEndpoints(s Service) Endpoints {
 		GetProfileEndpoint:    MakeGetProfileEndpoint(s),
 		PutProfileEndpoint:    MakePutProfileEndpoint(s),
 		DeleteProfileEndpoint: MakeDeleteProfileEndpoint(s),
+		GetCardsEndpoint:      MakeGetCardsEndpoint(s),
 	}
 }
 
@@ -121,6 +123,13 @@ func MakeDeleteProfileEndpoint(s Service) endpoint.Endpoint {
 		req := request.(deleteProfileRequest)
 		e := s.DeleteProfile(ctx, req.ID)
 		return deleteProfileResponse{Err: e}, nil
+	}
+}
+
+// MakeGetCardsEndpoint returns an endpoint via the passed service.
+func MakeGetCardsEndpoint(s Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		return s.GetCards()
 	}
 }
 

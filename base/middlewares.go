@@ -54,6 +54,13 @@ func (mw loggingMiddleware) DeleteProfile(ctx context.Context, id string) (err e
 	return mw.next.DeleteProfile(ctx, id)
 }
 
+func (mw loggingMiddleware) GetCards() (p PokemonResponse, err error) {
+	defer func(begin time.Time) {
+		mw.logger.Log("method", "GetCards", "took", time.Since(begin), "err", err)
+	}(time.Now())
+	return mw.next.GetCards()
+}
+
 func (mw loggingMiddleware) FetchData() (err error) {
 	defer func(begin time.Time) {
 		mw.logger.Log("method", "FetchData", "took", time.Since(begin), "err", err)
@@ -120,4 +127,14 @@ func (mw instrmw) DeleteProfile(ctx context.Context, id string) (err error) {
 
 	err = mw.Service.DeleteProfile(ctx, id)
 	return
+}
+
+func (mw instrmw) GetCards() (p PokemonResponse, err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "GetCards", "error", fmt.Sprint(err != nil)}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+
+	return mw.Service.GetCards()
 }
