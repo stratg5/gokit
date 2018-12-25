@@ -2,12 +2,9 @@ package main
 
 import (
 	"arood/base"
-	"bytes"
-	"context"
-	"encoding/json"
+	"arood/client"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -54,13 +51,15 @@ func main() {
 		Help:      "The result of each count method.",
 	}, []string{})
 
+	errs := make(chan error)
+
 	clientURL, err := url.Parse(*pokemonURL)
 	if err != nil {
-		fmt.Errorf("Failed to parse client url")
+		errs <- err
 	}
 
 	options := []kithttp.ClientOption{}
-	pokemonEndpoint := kithttp.NewClient(http.MethodGet, clientURL, encodeRequest, decodeGetProfileResponse, options...).Endpoint()
+	pokemonEndpoint := kithttp.NewClient(http.MethodGet, clientURL, client.EncodePokemonRequest, client.DecodePokemonResponse, options...).Endpoint()
 
 	var s base.Service
 	{
@@ -74,7 +73,6 @@ func main() {
 		h = base.MakeHTTPHandler(s, log.With(logger, "component", "HTTP"))
 	}
 
-	errs := make(chan error)
 	go func() {
 		c := make(chan os.Signal)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
@@ -94,20 +92,4 @@ func main() {
 	}()
 
 	logger.Log("exit", <-errs)
-}
-
-func decodeGetProfileResponse(_ context.Context, resp *http.Response) (interface{}, error) {
-	var response base.PokemonResponse
-	err := json.NewDecoder(resp.Body).Decode(&response)
-	return response, err
-}
-
-func encodeRequest(_ context.Context, req *http.Request, request interface{}) error {
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(request)
-	if err != nil {
-		return err
-	}
-	req.Body = ioutil.NopCloser(&buf)
-	return nil
 }
